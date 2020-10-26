@@ -1,7 +1,7 @@
 from .container import Container
 from .page import Page
 from .utils import decode_text
-
+from .display import BasePageImage,PageImage
 import pathlib
 import itertools
 from pdfminer.pdfparser import PDFParser
@@ -16,7 +16,9 @@ from pdfminer.psparser import PSLiteral
 class PDF(Container):
     cached_properties = Container.cached_properties + ["_pages"]
 
-    def __init__(self, stream, pages=None, laparams=None, precision=0.001, password=""):
+    def __init__(self, stream, pages=None, laparams=None, precision=0.001, password="",
+                 page_image_type:BasePageImage=PageImage):
+        self.page_image_type:BasePageImage = page_image_type
         self.laparams = None if laparams is None else LAParams(**laparams)
         self.stream = stream
         self.pages_to_parse = pages
@@ -63,7 +65,7 @@ class PDF(Container):
             page_number = i + 1
             if pp is not None and page_number not in pp:
                 continue
-            p = Page(self, page, page_number=page_number, initial_doctop=doctop)
+            p = Page(self, page, page_number=page_number, initial_doctop=doctop, page_image_type=self.page_image_type)
             self._pages.append(p)
             doctop += p.height
         return self._pages

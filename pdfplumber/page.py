@@ -2,6 +2,7 @@ from . import utils
 from .utils import resolve_all
 from .table import TableFinder
 from .container import Container
+from .display import BasePageImage,PageImage,DEFAULT_RESOLUTION
 import re
 
 lt_pat = re.compile(r"^LT")
@@ -47,7 +48,9 @@ class Page(Container):
     cached_properties = Container.cached_properties + ["_layout"]
     is_original = True
 
-    def __init__(self, pdf, page_obj, page_number=None, initial_doctop=0):
+    def __init__(self, pdf, page_obj, page_number=None, initial_doctop=0,
+                 page_image_type:BasePageImage=PageImage):
+        self.page_image_type:BasePageImage = page_image_type
         self.pdf = pdf
         self.page_obj = page_obj
         self.page_number = page_number
@@ -279,12 +282,12 @@ class Page(Container):
         For conversion_kwargs, see:
         http://docs.wand-py.org/en/latest/wand/image.html#wand.image.Image
         """
-        from .display import PageImage, DEFAULT_RESOLUTION
+        # from .display import PageImage, DEFAULT_RESOLUTION
 
         kwargs = dict(conversion_kwargs)
         if "resolution" not in conversion_kwargs:
             kwargs["resolution"] = DEFAULT_RESOLUTION
-        return PageImage(self, **kwargs)
+        return self.page_image_type(self, **kwargs)
 
     def __repr__(self):
         return f"<Page:{self.page_number}>"
@@ -293,7 +296,9 @@ class Page(Container):
 class DerivedPage(Page):
     is_original = False
 
-    def __init__(self, parent_page):
+    def __init__(self, parent_page,
+                 page_image_type:BasePageImage=PageImage):
+        self.page_image_type:BasePageImage = page_image_type
         self.parent_page = parent_page
         self.pdf = parent_page.pdf
         self.page_obj = parent_page.page_obj
@@ -327,7 +332,8 @@ def test_proposed_bbox(bbox, parent_bbox):
 
 
 class CroppedPage(DerivedPage):
-    def __init__(self, parent_page, bbox, crop_fn=utils.crop_to_bbox, relative=False):
+    def __init__(self, parent_page, bbox, crop_fn=utils.crop_to_bbox, relative=False,
+                 page_image_type:BasePageImage=PageImage):
         if relative:
             o_x0, o_top, _, _ = parent_page.bbox
             x0, top, x1, bottom = bbox
@@ -337,7 +343,7 @@ class CroppedPage(DerivedPage):
 
         test_proposed_bbox(self.bbox, parent_page.bbox)
         self.crop_fn = crop_fn
-        super().__init__(parent_page)
+        super().__init__(parent_page,page_image_type)
 
     @property
     def objects(self):
@@ -348,10 +354,11 @@ class CroppedPage(DerivedPage):
 
 
 class FilteredPage(DerivedPage):
-    def __init__(self, parent_page, filter_fn):
+    def __init__(self, parent_page, filter_fn,
+                 page_image_type:BasePageImage=PageImage):
         self.bbox = parent_page.bbox
         self.filter_fn = filter_fn
-        super().__init__(parent_page)
+        super().__init__(parent_page,page_image_type)
 
     @property
     def objects(self):
