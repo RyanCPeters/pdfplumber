@@ -90,6 +90,10 @@ class AbstractImageHandler:
             self._annotated = None
 
     @property
+    def draw(self):
+        return self
+
+    @property
     def stream(self):
         return self._stream
 
@@ -109,8 +113,9 @@ class AbstractImageHandler:
 
     @property
     def annotated_image(self):
-        """returns a pointer to the underlying annotated image, including any modifications,
-         in whatever format the implementing subclass is working with."""
+        """Returns a reference to the annotated image, in whatever format the
+        implementing subclass is working with.
+         """
         return self._annotated
 
     @original_image.setter
@@ -150,6 +155,11 @@ class AbstractImageHandler:
               Alternatively, they may simply apply the same cropping procedure to the
               annotated image if they have reason to keep existing annotations within the
               cropped region.
+
+
+        :param cropbox: A list or tuple that contains x,y coordinates for vertices of a bounding box that lies within
+        the area of the current original image.
+        :param kwargs: [optional] allows safe customization of method signature in image-handler subclasses.
         """
         raise NotImplementedError("AbstractImageHandler.crop_original(cropbox,**kwargs)")
 
@@ -175,9 +185,18 @@ class PILImageHandler(AbstractImageHandler):
             self._pil_draw = PIL.ImageDraw.Draw(self.annotated_image, "RGBA")
 
     @property
+    def draw(self):
+        """returns a reference to the PIL.ImageDraw.ImageDraw for the annotated image.
+
+        :return: PIL.ImageDraw.ImageDraw"""
+        return self._pil_draw
+
+    @property
     def original_image(self):
-        """returns a pointer to the underlying original image, unmodified from it's appearance in the source page,
-         in whatever format the implementing subclass is working with."""
+        """returns a reference to the original image, unmarked but possibly cropped,
+         as a PIL.Image.Image instance.
+
+        :return: PIL.Image.Image"""
         return self._original
 
     @original_image.setter
@@ -195,8 +214,9 @@ class PILImageHandler(AbstractImageHandler):
 
     @property
     def annotated_image(self):
-        """By handling image creation and access through getter/setter properties, image manipulation can be detached
-        from an explicit dependence upon `wand` and `PIL`."""
+        """Returns a reference to the annotated copy of the original image.
+
+        :return: PIL.Image.Image"""
         if self._annotated is None:
             self._annotated = self._original.copy()
         return self._annotated
@@ -253,6 +273,9 @@ class PILImageHandler(AbstractImageHandler):
     def reset(self, mode=None, **kwargs):
         """reset the annotated image, using the given image mode if applicable for the subclass's
         image type.
+
+        :param mode: [optional] a string describing the image mode as defined by PIL.Image._MODEINFO.
+        :param kwargs: [optional] allows safe customization of method signature in image-handler subclasses.
         """
         if mode is None:
             mode = self._original.mode
@@ -261,13 +284,19 @@ class PILImageHandler(AbstractImageHandler):
         self._pil_draw = PIL.ImageDraw.Draw(self._annotated, mode)
 
     def crop_original(self, cropbox, **kwargs):
-        """Given cropbox -- a sequence of 4 points -- crop the image data down to a box with vertices at those 4 points."""
+        """Given cropbox -- a sequence of 4 points -- crop the image data down to a box with vertices at those 4 points.
+        This function explicitly modifies the original image, and updates the annotated image to reflect this.
+
+        :param cropbox: A list or tuple that contains x,y coordinates for vertices of a bounding box that lies within
+        the area of the current original image.
+        :param kwargs: [optional] allows safe customization of method signature in image-handler subclasses.
+        """
         self._original = self._original.crop(cropbox)
         self.reset()
 
     def line(self, points, color, width, **kwargs):
         """given a sequence of x,y point data for a start point and an end point, draw a line in the given color and
-        width connecting those two points.
+        width connecting those two points on the annotated image.
 
         :param points: 2-tuple of x,y point coordinates, or a 4-tuple as (x0,y0,x1,y1). The two end-points of a
                        line segment
@@ -279,7 +308,7 @@ class PILImageHandler(AbstractImageHandler):
         self._pil_draw.line(points, fill=color, width=width)
 
     def rectangle(self, bbox, color, outline_color, **kwargs):
-        """
+        """Draw a rectangle on the annotated image.
 
         :param bbox: 2-tuple of x,y point coordinates, or a 4-tuple as (x0,y0,x1,y1). These points define 2 opposing
                     corners of the bounding box. Should be the top-left corner and bottom-right corners respectively.
@@ -291,7 +320,7 @@ class PILImageHandler(AbstractImageHandler):
         self._pil_draw.rectangle(bbox, fill=color, outline=outline_color)
 
     def ellipse(self, bbox, color, stroke, **kwargs):
-        """
+        """Draws an ellipse on the annotated image.
 
         :param bbox: 2-tuple of x,y point coordinates, or a 4-tuple as (x0,y0,x1,y1). These points define 2 opposing
                     corners of the bounding box. Should be the top-left corner and bottom-right corners respectively.
@@ -366,7 +395,7 @@ class BasePageImage(object):
     @property
     def draw(self):
         """A backwards compatability method for any user code that directly utlized the PageImage.draw member."""
-        return self._image_handler
+        return self._image_handler.draw
 
     def _reproject_bbox(self, bbox):
         x0, top, x1, bottom = bbox
